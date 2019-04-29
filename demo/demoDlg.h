@@ -38,4 +38,7 @@ public:
 	afx_msg void OnBnClickedButtonStart();
 	afx_msg void OnBnClickedButtonStop();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+protected:
+
+	afx_msg LRESULT OnMyMessage(WPARAM wParam, LPARAM lParam);
 };

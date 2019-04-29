@@ -1,4 +1,4 @@
-#include "vod.h"
+Ôªø#include "vod.h"
 
 #include <map>
 
@@ -16,11 +16,11 @@
 
 #include <windows.h>
 
-//Õ∑Œƒº˛
+//Â§¥Êñá‰ª∂
 #include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
-// ºÚµ•∂®“Â
+// ÁÆÄÂçïÂÆö‰πâ
 typedef boost::shared_mutex Lock;                  
 typedef boost::unique_lock< Lock >  WriteLock;
 typedef boost::shared_lock< Lock >  ReadLock;
@@ -31,8 +31,11 @@ struct Task
 {
 	int m_task_id;
 	std::string m_sign; 
+
 	std::string m_bucket,m_object,m_upload_id, m_cover_object, m_cover_upload_id;
-	std::string m_local,m_name, m_cover_local,m_cover_name;
+	uint64_t m_cos_appid;
+	
+	std::string m_local,m_name,m_type, m_cover_local,m_cover_name,m_cover_type;
 	std::string m_play_url, m_cover_url;
 	uint64_t m_file_size,m_cover_size;
 	uint64_t m_last_modify_time;
@@ -42,8 +45,12 @@ struct Task
 	qcloud_cos::CosAPI *m_cosapi;
 
 	Poco::SharedPtr<qcloud_cos::TransferHandler> handler;
+	uint64_t m_upload_size;
 
 	std::string m_vod_session_key;
+
+	char m_req_key[50];
+
 
 	int tt;
 };
@@ -57,7 +64,97 @@ int g_task_id = 1;
 std::string g_cfg_path;
 Task g_resume_task;
 
+int (*callbackfunction)(int taskId, qcloud_vod::VodTaskStatus status, int64_t uploadSize);
+
+void SetCallback(int(*cb)(int taskId, qcloud_vod::VodTaskStatus status, int64_t uploadSize))
+{
+	callbackfunction = cb;
+}
+
 int SaveResumeCfg(Task *task) ;
+
+void uploadprogress(const qcloud_cos::MultiUploadObjectReq *req, Poco::SharedPtr<qcloud_cos::TransferHandler> &handler) {
+	std::cout << "callback data is :" << handler->GetProgress() << std::endl;
+	WriteLock wLock(g_lock);
+	for (auto it = g_tasks.begin(); it != g_tasks.end(); it++) {
+		if (handler == it->second->handler){
+			it->second->m_upload_size = handler->GetProgress();
+			if (callbackfunction!=NULL)	
+				callbackfunction(it->first, it->second->m_stat, it->second->m_upload_size);
+			break;
+		}
+	}
+}
+
+void statusprogress(const qcloud_cos::MultiUploadObjectReq *req, Poco::SharedPtr<qcloud_cos::TransferHandler> &handler) {
+	std::cout << "callback status is :" << handler->GetStatusString() << std::endl;
+	Task *task = NULL;
+	{
+		WriteLock wLock(g_lock);
+		for (auto it = g_tasks.begin(); it != g_tasks.end(); it++) {
+			if (handler == it->second->handler) {
+				task = it->second;
+				break;
+			}
+		}
+	}
+
+	if (handler->GetStatus() != qcloud_cos::TransferStatus::COMPLETED) {
+		WriteLock wLock(g_lock);
+		task->m_stat = VodTaskStatus::Fail;
+		task->m_err = "upload cos fail \r\n" + handler->m_result.GetErrorInfo();
+
+		task->tt = int(handler->GetStatus());
+
+		if (handler->GetStatus() == qcloud_cos::TransferStatus::CANCELED) {
+			SaveResumeCfg(&g_resume_task);
+		}
+		if (callbackfunction != NULL)
+			callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
+		return;
+	}
+
+
+	{
+		g_resume_task.m_upload_id = "";
+		SaveResumeCfg(&g_resume_task);
+		WriteLock wLock(g_lock);
+		task->m_stat = VodTaskStatus::CommitUpload;
+	}
+	// 6. vod commit
+	uint64_t cmd_start_time, cmd_end_time;
+	cmd_start_time = qcloud_cos::HttpSender::GetTimeStampInUs() / 1000;
+	qcloud_vod::CommitUploadUGCReq c_req(task->m_sign);
+	qcloud_vod::CommitUploadUGCResp c_resp;
+	c_req.SetSessionKey(task->m_vod_session_key);
+	int ret = qcloud_vod::DoVodRequest(c_req, &c_resp);
+	cmd_end_time = qcloud_cos::HttpSender::GetTimeStampInUs() / 1000;
+
+	Json::Value report_data = c_resp.Report(task->m_cos_appid, task->m_file_size, task->m_type);
+	report_data["uuid"] = GetUuid();
+	report_data["reqKey"] = task->m_req_key;
+	report_data["reqTime"] = cmd_start_time;
+	report_data["reqTimeCose"] = cmd_end_time - cmd_start_time;
+	RequestReport(report_data);
+
+	if (ret != 0)
+	{
+		WriteLock wLock(g_lock);
+		task->m_stat = VodTaskStatus::Fail;
+		task->m_err = "commit fail \r\n" + c_resp.GetBody();
+		callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
+		return;
+	}
+
+	{
+		WriteLock wLock(g_lock);
+		task->m_play_url = c_resp.GetVideoUrl();
+		task->m_cover_url = c_resp.GetCoverUrl();
+		task->m_stat = VodTaskStatus::Finish;
+
+	}
+	callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
+}
 
 void SyncUpload(Task * task)
 {
@@ -71,8 +168,7 @@ void SyncUpload(Task * task)
 	std::string cover_typ;
 	// 1. vod apply
 	task_start_time = cmd_start_time = qcloud_cos::HttpSender::GetTimeStampInUs() / 1000;
-	char req_key[50];
-	sprintf(req_key, "%lld;%lld", task->m_last_modify_time, task_start_time);
+	sprintf(task->m_req_key, "%lld;%lld", task->m_last_modify_time, task_start_time);
 	qcloud_vod::ApplyUploadUGCReq apply_req(task->m_sign, typ, task->m_name, task->m_file_size);
 	if (task->m_cover_local.size())
 	{
@@ -93,7 +189,7 @@ void SyncUpload(Task * task)
 
 	Json::Value report_data = apply_resp.Report(apply_req);
 	report_data["uuid"] = GetUuid();
-	report_data["reqKey"] = req_key;
+	report_data["reqKey"] = task->m_req_key;
 	report_data["reqTime"] = cmd_start_time;
 	report_data["reqTimeCose"] = cmd_end_time - cmd_start_time;
 	RequestReport(report_data);
@@ -131,7 +227,7 @@ void SyncUpload(Task * task)
 
 
 	qcloud_cos::CosResult result;
-	if (task->m_stat == "cover")
+	if (task->m_stat == VodTaskStatus::UploadCover)
 	{
 		// 2. cos upload cover
 		qcloud_cos::PutObjectByFileReq put_req(task->m_bucket, task->m_cover_object, task->m_cover_local);
@@ -140,7 +236,7 @@ void SyncUpload(Task * task)
 
 		{
 			WriteLock wLock(g_lock);
-			task->m_stat = "video";
+			task->m_stat = VodTaskStatus::UploadMedia;
 		}
 	}
 
@@ -148,6 +244,8 @@ void SyncUpload(Task * task)
 		qcloud_cos::MultiUploadObjectReq req(task->m_bucket,
 			task->m_object, task->m_local);
 		req.SetRecvTimeoutInms(1000 * 60);
+		req.SetUploadProgressCallback(uploadprogress);
+		req.SetTransferStatusUpdateCallback(statusprogress);
 		qcloud_cos::MultiUploadObjectResp resp;
 
 		Poco::SharedPtr<qcloud_cos::TransferHandler> handler = cosapi->TransferUploadObject(req, &resp);
@@ -166,10 +264,11 @@ void SyncUpload(Task * task)
 			task->handler = handler;
 		}
 		handler->WaitUntilFinish();
+		return;
 
 		if (handler->GetStatus()!= qcloud_cos::TransferStatus::COMPLETED || !handler->m_result.IsSucc()) {
 			WriteLock wLock(g_lock);
-			task->m_stat = "fail";
+			task->m_stat = VodTaskStatus::Fail;
 			task->m_err = "upload cos fail \r\n" + handler->m_result.GetErrorInfo();
 
 			task->tt = int(handler->GetStatus());
@@ -186,7 +285,7 @@ void SyncUpload(Task * task)
 		g_resume_task.m_upload_id = "";
 		SaveResumeCfg(&g_resume_task);
 		WriteLock wLock(g_lock);
-		task->m_stat = "commit";
+		task->m_stat = VodTaskStatus::CommitUpload;
 	}
 	// 6. vod commit
 	cmd_start_time = qcloud_cos::HttpSender::GetTimeStampInUs() / 1000;
@@ -198,7 +297,7 @@ void SyncUpload(Task * task)
 
 	report_data = c_resp.Report(apply_resp.GetCosAppId(), apply_req.GetFileSize(), apply_req.GetFileType());
 	report_data["uuid"] = GetUuid();
-	report_data["reqKey"] = req_key;
+	report_data["reqKey"] = task->m_req_key;
 	report_data["reqTime"] = cmd_start_time;
 	report_data["reqTimeCose"] = cmd_end_time - cmd_start_time;
 	RequestReport(report_data);
@@ -206,7 +305,7 @@ void SyncUpload(Task * task)
 	if (ret != 0)
 	{
 		WriteLock wLock(g_lock);
-		task->m_stat = "fail";
+		task->m_stat = VodTaskStatus::Fail;
 		task->m_err = "commit fail \r\n" + c_resp.GetBody();
 		return;
 	}
@@ -215,7 +314,7 @@ void SyncUpload(Task * task)
 		WriteLock wLock(g_lock);
 		task->m_play_url = c_resp.GetVideoUrl();
 		task->m_cover_url = c_resp.GetCoverUrl();
-		task->m_stat = "finish";
+		task->m_stat = VodTaskStatus::Finish;
 
 	}
 }
@@ -271,7 +370,7 @@ int StartTask(std::string local_path, std::string name,
 	if (task->m_local.find_last_of('.')==std::string::npos ||
 		task->m_cover_local.size() && task->m_cover_local.find_last_of('.')==std::string::npos)
 	{
-		task->m_stat = "fail";
+		task->m_stat = VodTaskStatus::Fail;
 		task->m_err = "file path not have ext";
 		return -1;
 	}
@@ -343,8 +442,9 @@ uint64_t GetUploadedSize(int task_id)
 	if (g_tasks.count(task_id) == 1)
 	{
 		Task *task = g_tasks[task_id];
-		if (task->m_stat == "finish")
+		if (task->m_stat == VodTaskStatus::Finish)
 			return task->m_file_size;
+		return task->m_upload_size;
 		if (task->m_upload_id=="" || task->m_cosapi== NULL)
 			return 0;
 		if (!task->handler.isNull()){
@@ -374,7 +474,7 @@ std::string GetShowInfo(int task_id)
 			"\r\nlocal: " + task->m_local +
 			"\r\ncos_path: " + task->m_object +
 			"\r\nupload_id: " + task->m_upload_id +
-			"\r\nstat: " + task->m_stat +
+			"\r\nstat: " + itoa(task->m_stat, a,10) +
 			"\r\nerr: " + task->m_err +
 			"\r\ntt: " +itoa(task->tt, a, 10) +
 			"\r\ng_err: " + g_err;
@@ -382,7 +482,7 @@ std::string GetShowInfo(int task_id)
 	}
 	return "";
 }
-std::string GetTaskStatus(int task_id)
+VodTaskStatus GetTaskStatus(int task_id)
 {
 	ReadLock rLock(g_lock);
 	if (g_tasks.count(task_id) == 1)
@@ -390,7 +490,7 @@ std::string GetTaskStatus(int task_id)
 		Task *task = g_tasks[task_id];
 		return task->m_stat;
 	}
-	return "not exist";
+	return VodTaskStatus::NotExist;
 }
 std::string GetPlayUrl(int task_id)
 {

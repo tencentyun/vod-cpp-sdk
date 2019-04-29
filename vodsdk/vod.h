@@ -5,8 +5,22 @@
 
 namespace qcloud_vod{
 
+enum VodTaskStatus {
+	NotStart,
+	ApplyUpload,
+	UploadCover,
+	UploadMedia,
+	CommitUpload,
+	Finish,
+	Fail,
+	NotExist
+};
+
 //初始化函数，断点续传信息保存
 int InitConfig(std::string cfg_path);
+
+//设置回调通知函数
+void SetCallback(int(*cb)(int taskId, qcloud_vod::VodTaskStatus status, int64_t uploadSize));
 
 //设置分片上传的分片大小
 uint64_t SetUploadPartSize(uint64_t partsize);   
@@ -36,18 +50,10 @@ int DeleteTask(int task_id);
 uint64_t GetUploadedSize(int task_id);
 uint64_t GetFileSize(int task_id);
 
-enum VodTaskStatus {
-	NotStart,
-	ApplyUpload,
-	UploadCover,
-	UploadMedia,
-	CommitUpload,
-	Finish,
-	Fail
-};
+
 
 // 查询任务状态
-std::string GetTaskStatus(int task_id);
+VodTaskStatus GetTaskStatus(int task_id);
 
 // 用于demo展示任务调试信息
 std::string GetShowInfo(int task_id);

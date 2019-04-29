@@ -1,4 +1,4 @@
-#include "apply_upload.h"
+ï»¿#include "apply_upload.h"
 
 #include <iostream>
 
@@ -35,7 +35,7 @@ int ApplyUploadUGCReq::GenParams()
 }
 
 std::string ApplyUploadUGCReq::GenJsonBody(){
-	Json::Value jsonRoot; //¶¨Òå¸ù½Úµã
+	Json::Value jsonRoot; //å®šä¹‰æ ¹èŠ‚ç‚¹
 	jsonRoot["Signature"] = m_sign;
 
 	jsonRoot["VideoType"] = m_videoType;
@@ -59,11 +59,11 @@ std::string ApplyUploadUGCReq::GenJsonBody(){
 
 bool ApplyUploadUGCResp::ParseFromJsonString(const std::string& body)
 {
-	Json::Value jsonRoot; //¶¨Òå¸ù½Úµã
+	Json::Value jsonRoot; //å®šä¹‰æ ¹èŠ‚ç‚¹
 
 	std::string errs;
 	Json::Reader reader;
-	if (!reader.parse(body.data(), body.data()+body.size(), jsonRoot)) //´ÓifsÖĞ¶ÁÈ¡Êı¾İµ½jsonRoot
+	if (!reader.parse(body.data(), body.data()+body.size(), jsonRoot)) //ä»ifsä¸­è¯»å–æ•°æ®åˆ°jsonRoot
 	{
 		std::cout << errs << std::endl;
 		return -1;
@@ -154,22 +154,22 @@ Json::Value ApplyUploadUGCResp::Report(ApplyUploadUGCReq &req)
 
 	jsonRoot["version"] = "1.0.0.1";       //applyupload: 10001, commitUpload: 10002
 	jsonRoot["reqType"] = 10001;    //applyupload: 10001, commitUpload: 10002
-	jsonRoot["errCode"] = resp.GetCode();        //ÇëÇó»Ø°üµÃµ½
-	jsonRoot["errMsg"] = resp.GetMsg();        //ÇëÇó»Ø°üµÃµ½
-	//jsonRoot["reqTimeCost"] = 123;  //ÇëÇó»¨·ÑÊ±¼äºÁÃë
-	jsonRoot["reqServerIp"] = "";   //ÇëÇóµÄ·şÎñÆ÷ip
-	jsonRoot["platform"] = 3000;    //Æ½Ì¨ĞÅÏ¢£¨windows£º3000£¬android£º1000£¬ios£º1000£©
+	jsonRoot["errCode"] = resp.GetCode();        //è¯·æ±‚å›åŒ…å¾—åˆ°
+	jsonRoot["errMsg"] = resp.GetMsg();        //è¯·æ±‚å›åŒ…å¾—åˆ°
+	//jsonRoot["reqTimeCost"] = 123;  //è¯·æ±‚èŠ±è´¹æ—¶é—´æ¯«ç§’
+	jsonRoot["reqServerIp"] = "";   //è¯·æ±‚çš„æœåŠ¡å™¨ip
+	jsonRoot["platform"] = 3000;    //å¹³å°ä¿¡æ¯ï¼ˆwindowsï¼š3000ï¼Œandroidï¼š1000ï¼Œiosï¼š1000ï¼‰
 	jsonRoot["device"] = "pc";
 	jsonRoot["osType"] = "windows";
 	jsonRoot["netType"] = 5;        //wifi:1 4G:2 3G:3 2G:4 PC:5
-	//jsonRoot["reqTime"] = 1111;     //ÇëÇó·¢ÆğµÄÊ±¼äºÁÃë
+	//jsonRoot["reqTime"] = 1111;     //è¯·æ±‚å‘èµ·çš„æ—¶é—´æ¯«ç§’
 	jsonRoot["reportId"] = "";
 	//jsonRoot["reqKey"] = req_key;
-	jsonRoot["vodSessionKey"] = ""; //×¼±¸·ÏÆú£¬¿ÉÒÔ²»Ìî
+	jsonRoot["vodSessionKey"] = ""; //å‡†å¤‡åºŸå¼ƒï¼Œå¯ä»¥ä¸å¡«
 	jsonRoot["appId"] = resp.GetCosAppId();         
 	jsonRoot["fileSize"] = req.GetFileSize();
 	jsonRoot["fileType"] = req.GetFileType();
-	//jsonRoot["uuid"] = uuid;          //Éè±¸Î¨Ò»ID
+	//jsonRoot["uuid"] = uuid;          //è®¾å¤‡å”¯ä¸€ID
 	jsonRoot["fileId"] = "";
 
 	return jsonRoot;

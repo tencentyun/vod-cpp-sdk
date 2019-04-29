@@ -15,6 +15,7 @@
 #define IDC_EDIT_INFO                   1005
 #define IDC_BUTTON_STOP                 1006
 #define IDC_BUTTON_START                1007
+#define WM_MY_MESSAGE                   (WM_USER+100)
 
 // Next default values for new objects
 // 

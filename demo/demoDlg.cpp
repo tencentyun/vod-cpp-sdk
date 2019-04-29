@@ -69,12 +69,15 @@ BEGIN_MESSAGE_MAP(CdemoDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_COVER, &CdemoDlg::OnBnClickedButtonCover)
 	ON_BN_CLICKED(IDC_BUTTON_START, &CdemoDlg::OnBnClickedButtonStart)
 	ON_BN_CLICKED(IDC_BUTTON_STOP, &CdemoDlg::OnBnClickedButtonStop)
+	ON_MESSAGE(WM_MY_MESSAGE, &CdemoDlg::OnMyMessage)
 	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
 // CdemoDlg 消息处理程序
-
+int callbackfunction(int taskId, qcloud_vod::VodTaskStatus status, int64_t uploadSize);
+HWND ww;
+DWORD tt;
 BOOL CdemoDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
@@ -107,8 +110,75 @@ BOOL CdemoDlg::OnInitDialog()
 	// TODO: 在此添加额外的初始化代码
 
 	qcloud_vod::InitConfig("D:\\code_base\\cos-cpp-sdk-v5\\2008_new\\Release\\config.cfg");
+	qcloud_vod::SetCallback(callbackfunction);
+	ww = GetSafeHwnd();
+	tt=GetCurrentThreadId();
+
+	if (ww == 0 || tt == 0) tt = 1 / tt / int(ww);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
+}
+
+struct TaskStatus {
+	int TaskId;
+	qcloud_vod::VodTaskStatus status;
+	int64_t uploadsize;
+};
+
+LRESULT CdemoDlg::OnMyMessage(WPARAM wParam, LPARAM lParam) {
+	TaskStatus *task = (TaskStatus*)wParam;
+	CString cszMsg;
+	int cur = 0;
+	//cur = 1 / cur;
+	if (task->status == qcloud_vod::VodTaskStatus::Fail)
+	{
+		cszMsg = CString(_T("1上传失败...\r\n"));
+		cszMsg += qcloud_vod::GetShowInfo(m_task_id).c_str();
+		((CButton*)GetDlgItem(IDC_BUTTON_STOP))->EnableWindow(FALSE);
+		((CButton*)GetDlgItem(IDC_BUTTON_START))->EnableWindow(TRUE);
+		qcloud_vod::DeleteTask(m_task_id);
+	}
+	else
+	{
+		uint64_t total = qcloud_vod::GetFileSize(m_task_id);
+		if (total == 0)
+			cur = 0;
+		else cur = task->uploadsize * 100 / total;
+		if (task->status == qcloud_vod::VodTaskStatus::Finish)
+		{
+			cur = 100;
+			cszMsg = CString(_T("1上传完成...\r\n"));
+			cszMsg += qcloud_vod::GetShowInfo(m_task_id).c_str();
+			((CButton*)GetDlgItem(IDC_BUTTON_STOP))->EnableWindow(FALSE);
+			((CButton*)GetDlgItem(IDC_BUTTON_START))->EnableWindow(TRUE);
+			qcloud_vod::DeleteTask(m_task_id);
+		}
+		else
+		{
+			TCHAR szMsg[500];
+			sprintf_s(szMsg, _T("1正在上传 %d%%(%lld/%lld)...\r\n"), cur, task->uploadsize, total);
+			cszMsg = CString(szMsg);
+			cszMsg += qcloud_vod::GetShowInfo(m_task_id).c_str();
+		}
+	}
+
+	CProgressCtrl *pProgCtrl = (CProgressCtrl*)GetDlgItem(IDC_PROGRESS1);
+	pProgCtrl->SetPos(cur);
+	SetDlgItemText(IDC_EDIT_INFO, cszMsg);
+	delete task;
+	return 0;
+}
+
+
+int callbackfunction(int taskId, qcloud_vod::VodTaskStatus status, int64_t uploadSize) {
+	TaskStatus *task = new TaskStatus;
+	task->TaskId = taskId;
+	task->status = status;
+	task->uploadsize = uploadSize;
+	//PostAppMessage(ww, WM_MY_MESSAGE, WPARAM(task), 0);
+	PostMessage(ww, WM_MY_MESSAGE, WPARAM(task), 0);
+
+	return 0;
 }
 
 void CdemoDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -206,7 +276,7 @@ void CdemoDlg::OnBnClickedButtonStart()
 {
 	// TODO: 在此添加控件通知处理程序代码
 
-	SetTimer(1, 1000, NULL);
+	//SetTimer(1, 5000, NULL);
 	SetDlgItemText(IDC_EDIT_INFO, _T("正在上传 0%..."));
 	CProgressCtrl *pProgCtrl = (CProgressCtrl*)GetDlgItem(IDC_PROGRESS1);
 	pProgCtrl->SetRange(0, 100);
@@ -220,7 +290,7 @@ void CdemoDlg::OnBnClickedButtonStart()
 	//m_upload_id = UploadAysn(&local_path);
 	std::string p = CT2A(local_path);
 	std::string cp = CT2A(c_local_path);
-	std::string sign = "DJUqxM8/2V8+7PlUsxbyAi61HVBzZWNyZXRJZD1BS0lEMHBtbHIyMkNLY3IwQ2l0OVo2a011V0dvS1BWVlpYZ3cmY3VycmVudFRpbWVTdGFtcD0xNTU1NTU3MDkxJmV4cGlyZVRpbWU9MTU1NTY0MzQ5MSZyYW5kb209OTk0NzMzMzkw";
+	std::string sign = "PKEeM0KXXKm7fzkKga/IQRxsF3BzZWNyZXRJZD1BS0lEdnp2bjhDbGM3Q2swTDB1Ujh5SVUzQ3NqbG5mbnJ4anMmc3RvcmFnZVJlZ2lvbj1jcSZjdXJyZW50VGltZVN0YW1wPTE1NTY1MTcwOTQmZXhwaXJlVGltZT0xNTU2NjAzNDk0JnByb2NlZHVyZT1YSUFPWkhJQk8tREVGQVVMVCZyYW5kb209MTk1MzcwNjI1OA==";
 	m_task_id = qcloud_vod::StartTask(p, "aa.mp4", cp, "bb.png", "", sign);
 
 	//upload(local_path, NULL);
@@ -253,8 +323,8 @@ void CdemoDlg::OnTimer(UINT_PTR nIDEvent)
 	int cur = 0;
 	CString cszMsg;
 
-	std::string status = qcloud_vod::GetTaskStatus(m_task_id);
-	if (status == "fail")
+	qcloud_vod::VodTaskStatus status = qcloud_vod::GetTaskStatus(m_task_id);
+	if (status == qcloud_vod::VodTaskStatus::Fail)
 	{
 		cszMsg = CString(_T("上传失败...\r\n"));
 		cszMsg += qcloud_vod::GetShowInfo(m_task_id).c_str();
@@ -270,7 +340,7 @@ void CdemoDlg::OnTimer(UINT_PTR nIDEvent)
 		if (total == 0)
 			cur = 0;
 		else cur = up * 100 / total;
-		if (status=="finish")
+		if (status== qcloud_vod::VodTaskStatus::Finish)
 		{
 			cur = 100;
 			cszMsg = CString(_T("上传完成...\r\n"));
