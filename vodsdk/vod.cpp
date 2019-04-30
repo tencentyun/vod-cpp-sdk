@@ -266,56 +266,6 @@ void SyncUpload(Task * task)
 		handler->WaitUntilFinish();
 		return;
 
-		if (handler->GetStatus()!= qcloud_cos::TransferStatus::COMPLETED || !handler->m_result.IsSucc()) {
-			WriteLock wLock(g_lock);
-			task->m_stat = VodTaskStatus::Fail;
-			task->m_err = "upload cos fail \r\n" + handler->m_result.GetErrorInfo();
-
-			task->tt = int(handler->GetStatus());
-
-			if (handler->GetStatus() == qcloud_cos::TransferStatus::CANCELED) {
-				SaveResumeCfg(&g_resume_task);
-			}
-			return;
-		}
-
-	}
-
-	{
-		g_resume_task.m_upload_id = "";
-		SaveResumeCfg(&g_resume_task);
-		WriteLock wLock(g_lock);
-		task->m_stat = VodTaskStatus::CommitUpload;
-	}
-	// 6. vod commit
-	cmd_start_time = qcloud_cos::HttpSender::GetTimeStampInUs() / 1000;
-	qcloud_vod::CommitUploadUGCReq c_req(task->m_sign);
-	qcloud_vod::CommitUploadUGCResp c_resp;
-	c_req.SetSessionKey(apply_resp.GetSessionKey());
-	ret = qcloud_vod::DoVodRequest(c_req, &c_resp);
-	cmd_end_time = qcloud_cos::HttpSender::GetTimeStampInUs() / 1000;
-
-	report_data = c_resp.Report(apply_resp.GetCosAppId(), apply_req.GetFileSize(), apply_req.GetFileType());
-	report_data["uuid"] = GetUuid();
-	report_data["reqKey"] = task->m_req_key;
-	report_data["reqTime"] = cmd_start_time;
-	report_data["reqTimeCose"] = cmd_end_time - cmd_start_time;
-	RequestReport(report_data);
-
-	if (ret != 0)
-	{
-		WriteLock wLock(g_lock);
-		task->m_stat = VodTaskStatus::Fail;
-		task->m_err = "commit fail \r\n" + c_resp.GetBody();
-		return;
-	}
-
-	{
-		WriteLock wLock(g_lock);
-		task->m_play_url = c_resp.GetVideoUrl();
-		task->m_cover_url = c_resp.GetCoverUrl();
-		task->m_stat = VodTaskStatus::Finish;
-
 	}
 }
 
