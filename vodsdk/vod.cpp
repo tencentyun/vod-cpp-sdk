@@ -142,7 +142,8 @@ void statusprogress(const qcloud_cos::MultiUploadObjectReq *req, Poco::SharedPtr
 		WriteLock wLock(g_lock);
 		task->m_stat = VodTaskStatus::Fail;
 		task->m_err = "commit fail \r\n" + c_resp.GetBody();
-		callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
+		if (callbackfunction != NULL)
+			callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 		return;
 	}
 
@@ -153,7 +154,8 @@ void statusprogress(const qcloud_cos::MultiUploadObjectReq *req, Poco::SharedPtr
 		task->m_stat = VodTaskStatus::Finish;
 
 	}
-	callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
+	if (callbackfunction != NULL)
+		callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 }
 
 void SyncUpload(Task * task)
@@ -200,6 +202,8 @@ void SyncUpload(Task * task)
 		WriteLock wLock(g_lock);
 		task->m_stat = VodTaskStatus::Fail;
 		task->m_err = "apply fail \r\n" + apply_resp.GetBody();
+		if (callbackfunction != NULL)
+			callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 		return;
 	}
 
