@@ -290,8 +290,9 @@ void CdemoDlg::OnBnClickedButtonStart()
 	//m_upload_id = UploadAysn(&local_path);
 	std::string p = CT2A(local_path);
 	std::string cp = CT2A(c_local_path);
-	std::string sign = "PKEeM0KXXKm7fzkKga/IQRxsF3BzZWNyZXRJZD1BS0lEdnp2bjhDbGM3Q2swTDB1Ujh5SVUzQ3NqbG5mbnJ4anMmc3RvcmFnZVJlZ2lvbj1jcSZjdXJyZW50VGltZVN0YW1wPTE1NTY1MTcwOTQmZXhwaXJlVGltZT0xNTU2NjAzNDk0JnByb2NlZHVyZT1YSUFPWkhJQk8tREVGQVVMVCZyYW5kb209MTk1MzcwNjI1OA==";
+	std::string sign = "zXPzYRTTwcvUJXowl9Kt7zoAXzpzZWNyZXRJZD1BS0lEdnp2bjhDbGM3Q2swTDB1Ujh5SVUzQ3NqbG5mbnJ4anMmc3RvcmFnZVJlZ2lvbj1jcSZjdXJyZW50VGltZVN0YW1wPTE1NTcwMzg2NzQmZXhwaXJlVGltZT0xNTU3MTI1MDc0JnByb2NlZHVyZT1YSUFPWkhJQk8tREVGQVVMVCZyYW5kb209MTk1MzcwNjI1OA==";
 	m_task_id = qcloud_vod::StartTask(p, "aa.mp4", cp, "bb.png", "", sign);
+	//qcloud_vod::SetUploadPartSize(1024 * 1024*1024);
 
 	//upload(local_path, NULL);
 

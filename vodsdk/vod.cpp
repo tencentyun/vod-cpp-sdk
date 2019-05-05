@@ -120,6 +120,8 @@ void statusprogress(const qcloud_cos::MultiUploadObjectReq *req, Poco::SharedPtr
 		SaveResumeCfg(&g_resume_task);
 		WriteLock wLock(g_lock);
 		task->m_stat = VodTaskStatus::CommitUpload;
+		if (callbackfunction != NULL)
+			callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 	}
 	// 6. vod commit
 	uint64_t cmd_start_time, cmd_end_time;
@@ -165,6 +167,8 @@ void SyncUpload(Task * task)
 	{
 		WriteLock wLock(g_lock);
 		task->m_stat = VodTaskStatus::ApplyUpload;
+		if (callbackfunction != NULL)
+			callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 	}
 	std::string typ = task->m_local.substr(task->m_local.find_last_of('.') + 1);
 	std::string cover_typ;
@@ -222,10 +226,14 @@ void SyncUpload(Task * task)
 		if (task->m_cover_object != "")
 		{
 			task->m_stat = VodTaskStatus::UploadCover;
+			if (callbackfunction != NULL)
+				callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 		}
 		else
 		{
 			task->m_stat = VodTaskStatus::UploadMedia;
+			if (callbackfunction != NULL)
+				callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 		}
 	}
 
@@ -241,6 +249,8 @@ void SyncUpload(Task * task)
 		{
 			WriteLock wLock(g_lock);
 			task->m_stat = VodTaskStatus::UploadMedia;
+			if (callbackfunction != NULL)
+				callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 		}
 	}
 
@@ -253,7 +263,10 @@ void SyncUpload(Task * task)
 		qcloud_cos::MultiUploadObjectResp resp;
 
 		Poco::SharedPtr<qcloud_cos::TransferHandler> handler = cosapi->TransferUploadObject(req, &resp);
-
+		{
+			WriteLock wLock(g_lock);
+			task->handler = handler;
+		}
 		std::string id;
 
 		while (id == "" && !handler->IsFinishStatus(handler->GetStatus()))
@@ -265,7 +278,6 @@ void SyncUpload(Task * task)
 			WriteLock wLock(g_lock);
 			task->m_upload_id = id;
 			g_resume_task = *task;
-			task->handler = handler;
 		}
 		handler->WaitUntilFinish();
 		return;
