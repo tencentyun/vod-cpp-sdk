@@ -1,13 +1,25 @@
-1、开发环境
+# vod-cpp-sdk
+C++ SDK for tencent
 
-依赖库: 1、 cossdk 
-        2、 cossdk依赖库，包括jsoncpp boost_system boost_thread Poco ssl crypto
 
-推荐开发环境：
-visual studio 
+### 概要:
 
-2 安装过程
- 
+本SDK使用主要支持客户端的文件上传：
+-  主要功能以下几方面内容：
+	1. 文件上传
+	2. 断点续传
+	3. 分片上传
+	4. 附带上传媒体封面
+
+
+### 开发环境
+
+依赖库: 1、 cossdk 2、 cossdk依赖库，包括jsoncpp boost_system boost_thread Poco ssl crypto
+
+推荐开发环境： visual studio
+
+### 安装过程
+
 2.1、安装cossdk 文档：https://github.com/toranger/cos-cpp-sdk-v5
 
 2.2、安装cmake工具 http://www.cmake.org/download/
