@@ -106,9 +106,6 @@ void statusprogress(const qcloud_cos::MultiUploadObjectReq *req, Poco::SharedPtr
 
 		task->tt = int(handler->GetStatus());
 
-		if (handler->GetStatus() == qcloud_cos::TransferStatus::CANCELED) {
-			SaveResumeCfg(&g_resume_task);
-		}
 		if (callbackfunction != NULL)
 			callbackfunction(task->m_task_id, task->m_stat, task->m_upload_size);
 		return;
@@ -278,6 +275,7 @@ void SyncUpload(Task * task)
 			WriteLock wLock(g_lock);
 			task->m_upload_id = id;
 			g_resume_task = *task;
+			SaveResumeCfg(&g_resume_task);
 		}
 		handler->WaitUntilFinish();
 		return;
@@ -324,6 +322,7 @@ int StartTask(std::string local_path, std::string name,
 	std::string cover_local_path, std::string cover_name, std::string procedure, std::string sign)
 {
 	Task *task = new Task;
+	memset(task,0, sizeof(Task));
 	task->m_task_id = g_task_id;
 	task->m_local = local_path;
 	task->m_cover_local = cover_local_path;
