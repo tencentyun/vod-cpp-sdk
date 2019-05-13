@@ -322,7 +322,7 @@ int StartTask(std::string local_path, std::string name,
 	std::string cover_local_path, std::string cover_name, std::string procedure, std::string sign)
 {
 	Task *task = new Task;
-	memset(task,0, sizeof(Task));
+	task->m_upload_size = 0;
 	task->m_task_id = g_task_id;
 	task->m_local = local_path;
 	task->m_cover_local = cover_local_path;
