@@ -286,6 +286,7 @@ void SyncUpload(Task * task)
 
 int InitConfig(std::string cfg)
 {
+	CosSysConfig::SetAuthExpiredTime(1800);
 	g_cfg_path = cfg;
 	std::ifstream is(cfg.c_str(), std::ios::in);
     if (!is || !is.is_open()) {
