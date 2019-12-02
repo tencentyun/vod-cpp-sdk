@@ -191,7 +191,7 @@ uint64_t GetFileLastModifyTimeMs(std::string strPath)
 		tm.tm_sec     = sysTime.wSecond;
 		tm.tm_isdst    = -1;
 		clock = mktime(&tm);
-
+		CloseHandle(hFile);
 		return clock*(uint64_t)1000 + sysTime.wMilliseconds;
 	}
 	return 0;

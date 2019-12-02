@@ -66,6 +66,7 @@ bool ApplyUploadUGCResp::ParseFromJsonString(const std::string& body)
 	if (!reader.parse(body.data(), body.data()+body.size(), jsonRoot)) //从ifs中读取数据到jsonRoot
 	{
 		std::cout << errs << std::endl;
+		m_code = -1;
 		return -1;
 	}
 
